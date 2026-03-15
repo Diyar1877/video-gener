@@ -2,14 +2,18 @@ import io
 import os
 import subprocess
 import tempfile
+from dotenv import load_dotenv
 from flask import Flask, request, send_file, send_from_directory, jsonify
 from flask_cors import CORS
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
-MUSIC_DIR = os.path.join(os.path.dirname(__file__), 'music')
+BASE_DIR = os.path.dirname(__file__)
+VIDEO_DIR = os.path.join(BASE_DIR, os.getenv('VIDEO_DIR', 'videos'))
+MUSIC_DIR = os.path.join(BASE_DIR, os.getenv('MUSIC_DIR', 'music'))
 
 
 @app.route('/safety-videos-mp4/<path:filename>')
@@ -61,16 +65,6 @@ def merge_videos():
             for p in normalized:
                 fh.write(f"file '{p}'\n")
 
-        # Get durations
-        durations = []
-        for p in normalized:
-            probe = subprocess.run(
-                ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-                 '-of', 'default=noprint_wrappers=1:nokey=1', p],
-                capture_output=True, text=True,
-            )
-            durations.append(float(probe.stdout.strip()))
-
         output_path = os.path.join(tmpdir, 'output.mp4')
 
         result = subprocess.run(
@@ -103,4 +97,7 @@ def merge_videos():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    host = os.getenv('HOST', '0.0.0.0')
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_DEBUG', '0') == '1'
+    app.run(host=host, port=port, debug=debug)
