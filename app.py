@@ -40,30 +40,11 @@ def merge_videos():
             return jsonify({'error': f'Datei nicht gefunden: {f}'}), 404
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Normalize all videos to same format first
-        normalized = []
-        for i, f in enumerate(files):
-            src = os.path.join(VIDEO_DIR, os.path.basename(f))
-            norm_path = os.path.join(tmpdir, f'part{i}.ts')
-            r = subprocess.run(
-                [
-                    'ffmpeg', '-y', '-i', src,
-                    '-vf', 'scale=1280:720,fps=30,format=yuv420p',
-                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-                    '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k',
-                    norm_path,
-                ],
-                capture_output=True, text=True,
-            )
-            if r.returncode != 0:
-                return jsonify({'error': f'Fehler bei {f}', 'details': r.stderr}), 500
-            normalized.append(norm_path)
-
-        # Create concat list from normalized files
         list_path = os.path.join(tmpdir, 'list.txt')
         with open(list_path, 'w') as fh:
-            for p in normalized:
-                fh.write(f"file '{p}'\n")
+            for f in files:
+                src = os.path.join(VIDEO_DIR, os.path.basename(f))
+                fh.write(f"file '{src}'\n")
 
         output_path = os.path.join(tmpdir, 'output.mp4')
 
@@ -73,9 +54,8 @@ def merge_videos():
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', list_path,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-b:a', '192k',
+                '-c', 'copy',
+                '-movflags', '+faststart',
                 output_path,
             ],
             capture_output=True,
