@@ -10,9 +10,6 @@ CORS(app)
 
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 MUSIC_DIR = os.path.join(os.path.dirname(__file__), 'music')
-MUSIC_INTRO = os.path.join(MUSIC_DIR, 'intro.mp3')
-MUSIC_LOOP = os.path.join(MUSIC_DIR, 'loop.mp3')
-MUSIC_OUTRO = os.path.join(MUSIC_DIR, 'outro.mp3')
 
 
 @app.route('/safety-videos-mp4/<path:filename>')
@@ -74,12 +71,6 @@ def merge_videos():
             )
             durations.append(float(probe.stdout.strip()))
 
-        intro_dur = durations[0] if durations else 0
-        outro_dur = durations[-1] if durations else 0
-        total_dur = sum(durations)
-        middle_dur = total_dur - intro_dur - outro_dur
-
-        # Build music track: intro(30s) + loop(85s repeating) + outro(25s)
         output_path = os.path.join(tmpdir, 'output.mp4')
 
         result = subprocess.run(
@@ -88,19 +79,6 @@ def merge_videos():
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', list_path,
-                '-i', MUSIC_INTRO,
-                '-stream_loop', '-1',
-                '-i', MUSIC_LOOP,
-                '-i', MUSIC_OUTRO,
-                '-filter_complex',
-                f'[1:a]volume=0.08[intro];'
-                f'[2:a]volume=0.08,atrim=0:{middle_dur}[mid];'
-                f'[3:a]volume=0.08[outro];'
-                f'[intro][mid][outro]concat=n=3:v=0:a=1[music];'
-                f'[0:a]volume=1.0[voice];'
-                f'[voice][music]amix=inputs=2:duration=first:normalize=0[aout]',
-                '-map', '0:v',
-                '-map', '[aout]',
                 '-c:v', 'copy',
                 '-c:a', 'aac',
                 '-b:a', '192k',
