@@ -1,4 +1,4 @@
-import io
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -14,6 +14,8 @@ CORS(app)
 BASE_DIR = os.path.dirname(__file__)
 VIDEO_DIR = os.path.join(BASE_DIR, os.getenv('VIDEO_DIR', 'videos'))
 MUSIC_DIR = os.path.join(BASE_DIR, os.getenv('MUSIC_DIR', 'music'))
+CACHE_DIR = os.path.join(BASE_DIR, 'cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 
 @app.route('/safety-videos-mp4/<path:filename>')
@@ -38,6 +40,19 @@ def merge_videos():
         path = os.path.join(VIDEO_DIR, os.path.basename(f))
         if not os.path.isfile(path):
             return jsonify({'error': f'Datei nicht gefunden: {f}'}), 404
+
+    # Cache-Key aus Dateinamen erzeugen
+    cache_key = hashlib.md5('|'.join(files).encode()).hexdigest()
+    cache_path = os.path.join(CACHE_DIR, f'{cache_key}.mp4')
+
+    # Wenn schon gecached, sofort ausliefern
+    if os.path.isfile(cache_path):
+        return send_file(
+            cache_path,
+            mimetype='video/mp4',
+            as_attachment=True,
+            download_name='safety2-praesentation.mp4',
+        )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         list_path = os.path.join(tmpdir, 'list.txt')
@@ -65,11 +80,11 @@ def merge_videos():
         if result.returncode != 0:
             return jsonify({'error': 'FFmpeg Fehler', 'details': result.stderr}), 500
 
-        with open(output_path, 'rb') as f:
-            buf = io.BytesIO(f.read())
+        # In Cache speichern
+        os.rename(output_path, cache_path)
 
     return send_file(
-        buf,
+        cache_path,
         mimetype='video/mp4',
         as_attachment=True,
         download_name='safety2-praesentation.mp4',
